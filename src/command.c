@@ -42,6 +42,7 @@
 #include "g_sensor.h"
 #include "auto_test.h"
 #include "watch_dog.h"
+#include "bms.h"
 
 #pragma diag_suppress 870 
 
@@ -107,6 +108,7 @@ typedef enum
     CMD_RESULT,
     CMD_PMTK,
     CMD_HARD_REBOOT,
+    CMD_BMS_BATTERY,
     
 	CMD_CMD_MAX,
 }CommandID;
@@ -178,6 +180,7 @@ static CommandInfo s_cmd_infos[CMD_CMD_MAX + 1] =
     {"RESULT",CMD_RESULT},
 	{"PMTK",CMD_PMTK},
 	{"HARDREBOOT",CMD_HARD_REBOOT},
+	{"BATTERY",CMD_BMS_BATTERY},
 };
 
 static CommandID get_cmd_id(const char* cmd_name);
@@ -415,6 +418,7 @@ GM_ERRCODE command_on_receive_data(CommandReceiveFromEnum from, char* p_cmd, u16
 	command_scan((char*)p_cmd_content, "s", cmd_name);
 	util_string_upper((U8*)cmd_name,GM_strlen(cmd_name));
 	cmd_id = get_cmd_id(cmd_name);
+		
 	switch (cmd_id)
 	{
 		case CMD_DEVICE_TYPE:
@@ -903,6 +907,67 @@ GM_ERRCODE command_on_receive_data(CommandReceiveFromEnum from, char* p_cmd, u16
 			para_num = command_scan((char*)p_cmd_content, "s;w", cmd_name,&is_on);
 			if (para_num == 1)
 			{
+				char is_on_str[20] = {0};
+				
+ 				config_service_get(CFG_IS_BMS_MOS_CUT_OFF, TYPE_BOOL, &is_on, sizeof(is_on));
+				if (1 == lang && COMMAND_GPRS == from)
+				{	
+					if(is_on)
+					{
+						GM_strcpy(is_on_str, "已断开MOS放电");
+					}
+					else
+					{
+						GM_strcpy(is_on_str, "已打开MOS放电");
+					}
+					GM_snprintf((char*)p_rsp,CMD_MAX_LEN, "MOS状态:%s", is_on_str);
+				}
+				else
+				{
+					if(is_on)
+					{
+						GM_strcpy(is_on_str, "OFF");
+					}
+					else
+					{
+						GM_strcpy(is_on_str, "ON");
+					}
+					GM_snprintf((char*)p_rsp,CMD_MAX_LEN, " MOS:%s", is_on_str);
+				}
+				
+			}
+			else if (para_num == 2)
+			{
+				if (1 == lang && COMMAND_GPRS == from)
+				{
+					if (is_on)
+					{
+						GM_snprintf((char*)p_rsp,CMD_MAX_LEN, "断开MOS放电成功");
+					}
+					else
+					{
+						GM_snprintf((char*)p_rsp,CMD_MAX_LEN, "打开MOS放电成功");
+					}
+				}
+				else
+				{
+					if (is_on)
+					{
+						GM_snprintf((char*)p_rsp,CMD_MAX_LEN, "Succeed to cut off battery mos current output.");
+					}
+					else
+					{
+						GM_snprintf((char*)p_rsp,CMD_MAX_LEN, "Succeed to restore battery mos current output.");
+					}
+				}
+				
+    			config_service_set(CFG_IS_BMS_MOS_CUT_OFF, TYPE_BOOL, &is_on, sizeof(is_on));
+				bms_battery_mos_output_ctrl(is_on);
+				config_service_save_to_local();
+			}
+			/*
+			if (para_num == 1)
+			{
 				char is_on_str[10] = {0};
  				is_on = system_state_get_device_relay_state();
 				if (1 == lang && COMMAND_GPRS == from)
@@ -993,7 +1058,7 @@ GM_ERRCODE command_on_receive_data(CommandReceiveFromEnum from, char* p_cmd, u16
 						}
 					}
 				}	
-			}
+			}*/
 			else
 			{ 
 				char wrong_command_rsp_chinese[CMD_MAX_LEN] = "指令格式错误,请修改后重试";
@@ -2599,6 +2664,16 @@ GM_ERRCODE command_on_receive_data(CommandReceiveFromEnum from, char* p_cmd, u16
 		{
 			watch_dog_hard_reboot();
 			GM_memcpy(p_rsp, set_success_rsp(from), CMD_MAX_LEN);
+		}
+		break;
+
+		case CMD_BMS_BATTERY:
+		{
+			if (GM_EMPTY_BUF == bms_battery_request_response(p_rsp))
+			{
+				LOG(ERROR, "bms_battery_request_response len(%d), %s", GM_strlen(p_rsp), p_rsp);
+				GM_memcpy(p_rsp, set_success_rsp(from), CMD_MAX_LEN);
+			}
 		}
 		break;
 		

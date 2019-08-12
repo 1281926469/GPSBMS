@@ -136,6 +136,7 @@ void timer_10ms_proc(void)
 		g_sensor_timer_proc();
     	gprs_timer_proc();
 		hard_ware_timer_proc();
+		bms_timer_proc();
 	}
 }
 
@@ -163,6 +164,7 @@ void kal_timer_1s_proc(void* p_arg)
 		g_sensor_timer_proc();
 		gprs_timer_proc();
 		hard_ware_timer_proc();
+		bms_timer_proc();
 
 		//正常处理
 		util_timer_proc();

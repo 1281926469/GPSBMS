@@ -17,6 +17,8 @@
 #include "command.h"
 #include "applied_math.h"
 #include "agps_service.h"
+#include "bms.h"
+#include "gm_timer.h"
 
 typedef enum
 {
@@ -33,6 +35,7 @@ typedef enum
     PROTOCCOL_GOOME_GENERAL_MSG = 0x81, // 普通消息下发数据包 
     PROTOCCOL_GOOME_FULL_LBS = 0x91, // 多基站数据
     PROTOCCOL_GOOME_STATUS_MSG = 0x94, //信息传输通用包
+    PROTOCCOL_GOOME_TRANSPARENT = 0xFE, //透传数据包
 }ProtocolGoomeCmdEnum;;
 
 
@@ -58,7 +61,7 @@ static void protocol_goome_pack_alarm(AlarmInfo *alarm,U8* pdata, u16 *idx, u16 
 static void protocol_goome_pack_csq(U8* pdata, u16 *idx, u16 len);
 static void protocol_goome_pack_power_voltage(U8* pdata, u16 *idx, u16 len);
 static void protocol_goome_pack_gps_signal_quality(U8* pdata, u16 *idx, u16 len);
-
+static void protocol_goome_pack_transprent(u8* pdata, u16 *idx, u16 len, char* trans_msg, u16 trans_len);
 static void protocol_goome_parse_login_response(U8* pdata, u16 len);
 static void protocol_goome_parse_remote_msg(U8* pdata, u16 len);
 
@@ -479,6 +482,31 @@ static void protocol_goome_pack_lbs(U8* pdata, u16 *idx, u16 len)
 }
 
 
+static void protocol_goome_pack_transprent(u8* pdata, u16 *idx, u16 len, char* trans_msg, u16 trans_len)
+{
+	if((*idx) + trans_len > len)
+    {
+        LOG(WARN,"clock(%d) protocol_goome_pack_transprent assert(len(%d)) failed.", util_clock(), len);
+        return;
+    }
+
+	GM_memcpy(&pdata[(*idx)], trans_msg, trans_len);
+	(*idx) = (*idx) + trans_len;
+}
+
+
+
+void protocol_goome_pack_transprent_msg(u8* pdata, u16 *idx, u16 len, char* trans_msg, u16 trans_len)
+{
+    protocol_goome_pack_head(pdata, idx, len);  //7 bytes
+    
+    protocol_goome_pack_transprent(pdata, idx, len, trans_msg, trans_len); //不定长
+
+    protocol_goome_pack_id_len(pdata, PROTOCCOL_GOOME_TRANSPARENT, *idx);
+}
+
+
+
 void protocol_goome_pack_login_msg(U8* pdata, u16 *idx, u16 len)
 {
     protocol_goome_pack_head(pdata, idx, len);  //7 bytes
@@ -671,6 +699,7 @@ static void protocol_goome_parse_login_response(U8* pdata, u16 len)
     
     //发送iccid
     gps_service_after_login_response();
+	GM_StartTimer(GM_TIMER_BMS_TRANSPRENT, 1000, bms_transprent_callback);
     
     return;
 }
