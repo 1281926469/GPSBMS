@@ -42,6 +42,8 @@
 #include "main.h"
 #include "hard_ware.h"
 #include "uart.h"
+#include "bms.h"
+
 	
 //写控制bit
 #define I2C_WR 0
@@ -1515,6 +1517,7 @@ static void check_static_or_run(float vehicle_horizontal_aclr_magnitude)
 				LOG(WARN,"MOVE ALARM");
 			}
 			system_state_set_vehicle_state(VEHICLE_STATE_RUN);
+			GM_StartTimer(GM_TIMER_BMS_TRANSPRENT, 1000, bms_transprent_callback);
 		}
 		LOG(INFO,"RUN:aclr=%f,thr=%f",vehicle_horizontal_aclr_magnitude,s_gsensor.threshold.run_thr);
   	}
@@ -1555,6 +1558,7 @@ static void check_static_or_run(float vehicle_horizontal_aclr_magnitude)
 		{
 			LOG(INFO,"RUN because of speed,time:%d,gps aclr:%f",gps_get_constant_speed_time(),gps_get_aclr());
 			system_state_set_vehicle_state(VEHICLE_STATE_RUN);
+			GM_StartTimer(GM_TIMER_BMS_TRANSPRENT, 1000, bms_transprent_callback);
 		}
     }
 }

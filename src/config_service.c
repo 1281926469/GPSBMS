@@ -104,8 +104,6 @@ static const ConfigParamStruct s_config_param[] =
     {"CRASHTHR_H",                      CFG_SEN_SERIOUS_COLLISION},
 	{"SMOOTH",                          CFG_SMOOTH_TRACK},
 	{"MINSNR",                          CFG_MIN_SNR},
-	{"BMS",                          	CFG_BMS},
-	{"BMSVER",                          CFG_BMS_VER},
 };
 
 typedef struct

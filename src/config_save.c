@@ -1002,6 +1002,9 @@ static void config_service_set_factory_deault(void)
 
 	value_u8 = false;
     config_service_set(CFG_IS_ACLRALARM_ENABLE, TYPE_BOOL, &value_u8, sizeof(value_u8));
+
+	value_u8 = false;
+	config_service_set(CFG_IS_BMS_MOS_CUT_OFF, TYPE_BOOL, &value_u8, sizeof(value_u8));
 	
 	value_u8 = false;
     config_service_set(CFG_IS_LBS_ENABLE, TYPE_BOOL, &value_u8, sizeof(value_u8));
@@ -1803,6 +1806,17 @@ static void convert_cfg_to_para(GprsParaFileType *para)
         CLR_BIT30(para->param_bits);
     }
 
+	config_service_get(CFG_IS_BMS_MOS_CUT_OFF, TYPE_BOOL, &value_u8, sizeof(value_u8));
+    if (value_u8)
+    {
+        SET_BIT31(para->param_bits);
+    }
+    else
+    {
+        CLR_BIT31(para->param_bits);
+    }
+	
+
 
     config_service_get(CFG_CENTER_NUMBER, TYPE_STRING, para->center_number, sizeof(para->center_number));
     config_service_get(CFG_USER1_NUMBER, TYPE_STRING, para->user_number_1, sizeof(para->user_number_1));
@@ -2170,6 +2184,9 @@ static void convert_para_to_cfg(const GprsParaFileType *para)
 	value_u8 = GET_BIT30(para->param_bits);
     config_service_set(CFG_IS_ACLRALARM_ENABLE, TYPE_BOOL, &value_u8, sizeof(value_u8));
 
+	value_u8 = GET_BIT31(para->param_bits);
+    config_service_set(CFG_IS_BMS_MOS_CUT_OFF, TYPE_BOOL, &value_u8, sizeof(value_u8));
+	
     config_service_set(CFG_CENTER_NUMBER, TYPE_STRING, para->center_number, GM_strlen((char *)para->center_number));
     config_service_set(CFG_USER1_NUMBER, TYPE_STRING, para->user_number_1, GM_strlen((char *)para->user_number_1));
     config_service_set(CFG_USER2_NUMBER, TYPE_STRING, para->user_number_2, GM_strlen((char *)para->user_number_2));

@@ -254,6 +254,11 @@ GM_ERRCODE uart_close_port(const UARTPort port)
 		GM_GpioInit(GM_GPIO12, PINDIRECTION_IN, PINLEVEL_LOW, PINPULLSEL_DISABLE);
 		GM_GpioInit(GM_GPIO17, PINDIRECTION_IN, PINLEVEL_LOW, PINPULLSEL_DISABLE);
 	}
+	if (GM_UART_BMS == port)
+	{
+		GM_GpioInit(GM_GPIO0, PINDIRECTION_IN, PINLEVEL_LOW, PINPULLSEL_DISABLE);
+		GM_GpioInit(GM_GPIO1, PINDIRECTION_IN, PINLEVEL_LOW, PINPULLSEL_DISABLE);
+	}
 	return GM_SUCCESS;
 }
 
@@ -458,9 +463,9 @@ static void bms_port_on_receive(void* msg)
 		GM_memset(g_uart.UARTParas[GM_UART_BMS].rcv_buff, 0, GM_UART_RCV_BUFF_LEN);
 		len = GM_UartRead((Enum_SerialPort)GM_UART_BMS, (U8*)g_uart.UARTParas[GM_UART_BMS].rcv_buff, GM_UART_RCV_BUFF_LEN);
 		if (len > 0)
-		{	  
-			uart_write(GM_UART_DEBUG,"[RECV]:", sizeof("[RECV]:")-1);
-			bms_uart_receive_data(g_uart.UARTParas[GM_UART_BMS].rcv_buff,len,NULL,NULL);
+		{
+			LOG(DEBUG, "clock(%d), bms_port_on_receive len(%d).", util_clock(), len);
+			bms_uart_receive(g_uart.UARTParas[GM_UART_BMS].rcv_buff,len);
 		}
 		else
 		{

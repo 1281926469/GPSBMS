@@ -29,7 +29,7 @@
 #include "gps.h"
 
 //发布版修改这个数字
-#define VERSION_NUMBER  "2.0.70"
+#define VERSION_NUMBER  "2.0.75"
 
 
 #define APN_DEFAULT "CMNET"
@@ -319,10 +319,8 @@ typedef enum
     CFG_IS_MOVEALARM_ENABLE,
     //是否开启加速度报警(急加速、急减速、急转弯报警)
     CFG_IS_ACLRALARM_ENABLE,
-    //是否打开BMS功能,默认关闭
-    CFG_BMS,
-    //BMS版本
-    CFG_BMS_VER,
+    //是否开启BMS放电MOS开关
+    CFG_IS_BMS_MOS_CUT_OFF,
     
     
     CFG_CUSTOM_CODE,      //客户代码

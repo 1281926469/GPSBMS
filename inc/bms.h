@@ -24,6 +24,7 @@
 #define __BMS_H_
 #include "error_code.h"
 #include "gm_type.h"
+#include "command.h"
 
 
 
@@ -53,16 +54,22 @@ GM_ERRCODE bms_destroy(void);
  * Input:	   无
  * Output:	   无
  * Return:	   GM_SUCCESS——成功；其它错误码——失败
- * Others:	   1秒钟调用1次
+ * Others:	   10毫秒调用1次
  */
 GM_ERRCODE bms_timer_proc(void);
 
 
-GM_ERRCODE bms_cmd_write(char *cmd, u8 len);
+GM_ERRCODE bms_uart_receive(char* p_cmd, u16 cmd_len);
 
-GM_ERRCODE bms_msg_receive(char* p_cmd, u16 cmd_len);
+GM_ERRCODE bms_battery_request_response(char *json_str);
 
-GM_ERRCODE bms_uart_receive_data(char* p_cmd, u16 cmd_len, char* p_rsp, void * pmsg);
+void bms_transprent_callback(void);
+
+GM_ERRCODE bms_battery_mos_output_ctrl(u8 is_on);
+
+
+
+
 
 
 #endif /*__BMS_H_*/

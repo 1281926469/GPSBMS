@@ -44,6 +44,7 @@
 #include "led.h"
 #include "gsm.h"
 #include "utility.h"
+#include "bms.h"
 
 
 #define GPS_BUFF_LEN 50
@@ -639,6 +640,8 @@ GM_ERRCODE gps_power_off(void)
 	hard_ware_close_gps();
 	hard_ware_sleep();
 	s_gps.sleep_time = util_clock();
+
+	bms_destroy();
 	return GM_SUCCESS;
 }
 
@@ -1199,7 +1202,7 @@ void gps_on_rcv_uart_data(char* p_data, const U16 len)
 				LOG(DEBUG,"msg_number:%d,total_msgs:%d",s_gps.frame_gsv.msg_number,s_gps.frame_gsv.total_msgs);
 				for (index_sate = 0; index_sate < 4; index_sate++)
 				{
-					LOG(DEBUG,"$BDGSV: sat nr %d, elevation: %d, azimuth: %d, snr: %d dbm\n",
+					LOG(DEBUG,"$BDGSV: sat nr %d, elevation: %d, azimuth: %d, snr: %d dbm",
 						s_gps.frame_gsv.satellites[index_sate].nr,
 						s_gps.frame_gsv.satellites[index_sate].elevation,
 						s_gps.frame_gsv.satellites[index_sate].azimuth,
