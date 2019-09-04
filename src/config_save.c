@@ -1080,7 +1080,7 @@ static void config_service_set_factory_deault(void)
     value_u16 = GPS_NOT_FIXED_DEFAULT;
     config_service_set(CFG_WAIT_GPS_TIME, TYPE_SHORT, &value_u16, sizeof(value_u16));
 
-    value_u8 = 30;
+    value_u8 = 9;
     config_service_set(CFG_REOPEN_GSP_TIME, TYPE_BYTE, &value_u8, sizeof(value_u8));
 
     value_u16 = 720;
@@ -1436,13 +1436,8 @@ bool config_service_is_test_mode(void)
 
 bool config_service_is_default_imei(void)
 {
-    GM_ERRCODE ret = GM_SUCCESS;
     u8 imei[GM_IMEI_LEN + 1] = {0};
-    if(GM_SUCCESS != (ret = gsm_get_imei(imei)))
-    {
-        LOG(INFO,"clock(%d) config_service_is_default_imei can not get imei, ret:%d.", util_clock(), ret);
-        return false;
-    }
+	gsm_get_imei(imei);
     if (0 == GM_strcmp((const char *)imei, (const char *)GOOME_IMEI_DEFAULT))
     {
         LOG(INFO,"clock(%d) config_service_is_default_imei(%s) = true.", util_clock(), imei);

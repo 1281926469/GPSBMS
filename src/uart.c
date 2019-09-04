@@ -322,7 +322,7 @@ static void debug_port_on_receive(void* msg)
 		if (len > 0)
 		{     
 			command_on_receive_data(COMMAND_UART,g_uart.UARTParas[GM_UART_DEBUG].rcv_buff,len,cmd_rsp,NULL);
-			if (GM_SUCCESS != bms_msg_receive(g_uart.UARTParas[GM_UART_DEBUG].rcv_buff,len))
+			if (GM_SUCCESS != bms_uart_receive(g_uart.UARTParas[GM_UART_DEBUG].rcv_buff,len))
 			{
 				//加结束符
 				GM_snprintf(cmd_rsp + GM_strlen(cmd_rsp), (CMD_MAX_LEN - GM_strlen(cmd_rsp)), "\r\n");

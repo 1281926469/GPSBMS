@@ -275,7 +275,7 @@ GM_ERRCODE update_filemod_timer_proc(void)
     case SOCKET_STATUS_WORK:
         update_filemod_work_proc();
         break;
-    // 没有 SOCKET_STATUS_ERROR 状�?因为进该状态就会调update_service_destroy
+    // 没有 SOCKET_STATUS_ERROR 状态,因为进该状态就会调update_service_destroy
     //case SOCKET_STATUS_ERROR:
         //break;
     default:
@@ -372,7 +372,7 @@ static void update_filemod_work_proc(void)
     if((current_time - s_file_socket.send_time) > MESSAGE_TIME_OUT)
     {
         s_file_socket.status_fail_count ++;
-        one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: 1;
+        one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: UPDATE_MAX_PACK_ONE_SEND;
         
         if(s_file_socket.status_fail_count >= (MAX_MESSAGE_REPEAT * one_send))
         {
@@ -498,7 +498,7 @@ void update_msg_pack_request(u8 *pdata, u16 *idx, u16 len)
     (*idx) += copy_len_fix;
 
     
-    /*u8 termianl_version[20]; //终端当前版本�?*/
+    /*u8 termianl_version[20]; //终端当前版本号 */
     copy_len_fix = copy_len = 20;
     GM_memset(pdata+(*idx),0, copy_len);
     copy_len= (config_service_get_length(CFG_TERM_VERSION, TYPE_STRING) > copy_len)?copy_len:
@@ -507,16 +507,26 @@ void update_msg_pack_request(u8 *pdata, u16 *idx, u16 len)
     (*idx) += copy_len_fix;
 
 
-    /*u8 terminal_version_check[10]; //终端当前版本校验�?*/
+    /*u8 terminal_version_check[10]; //终端当前版本校验码 */
     copy_len_fix = copy_len = 10;
     GM_memset(pdata+(*idx),0, copy_len);
-    checksum = update_filemod_get_checksum(UPDATE_TARGET_IMAGE);
+
+    //lz modified for only save at most 2 copies. 
+    // master/minor both exist , use master
+    if (GM_FS_CheckFile(UPDATE_TARGET_IMAGE) >= 0)
+    {
+        checksum = update_filemod_get_checksum(UPDATE_TARGET_IMAGE);
+    }
+    else  // UPDATE_MINOR_IMAGE 肯定存在, 否则不可能运行
+    {
+        checksum = update_filemod_get_checksum(UPDATE_MINOR_IMAGE);
+    }
 	LOG(INFO,"Bin file check sum:%4X",checksum);
     util_long_to_asc(checksum, pdata+(*idx), 0);
     (*idx) += copy_len_fix;
 
     
-    /*u8 terminal_boot_check[10]; //终端当前版本BOOT校验�?*/
+    /*u8 terminal_boot_check[10]; //终端当前版本BOOT校验码 */
     copy_len_fix = copy_len = 10;
     GM_memset(pdata+(*idx),0, copy_len);
     copy_len= (config_service_get_length(CFG_TERM_BOOT_CHECK, TYPE_STRING) > copy_len)?copy_len:
@@ -536,8 +546,8 @@ void update_msg_receive(SocketType *socket)
     static u32 packet_error_start = 0;
 
     /*
-    update协议   最�?
-        信息�?0x68 0x68)    2 协议�?    包长�?(下一字节至data_end)         check2 0xD
+    update协议   最短7
+        信息头(0x68 0x68)    2 协议号1    包长度2(下一字节至data_end)         check2 0xD
     */
 
     if(GM_SUCCESS != fifo_peek(&socket->fifo, head, len))
@@ -587,12 +597,14 @@ void update_msg_receive(SocketType *socket)
                 LOG(WARN,"clock(%d) update_msg_receive MAX_GPRS_PART_MESSAGE_TIMEOUT.",util_clock());
                 //clear fifo and restart socket.
                 fifo_reset(&socket->fifo);
-                gm_socket_close_for_reconnect(socket);
+                s_file_extend.result = REPORT_RESULT_FAILED;
+                update_filemod_close_for_reconnect();
                 packet_error_start = 0;
             }
         }
         return;
     }
+    packet_error_start = 0;
     fifo_pop_len(&socket->fifo, msg_len);
 
 	LOG(DEBUG,"clock(%d) update_msg_receive msg len(%d)", util_clock(), msg_len);
@@ -629,7 +641,7 @@ static void update_msg_parse(u8 *pdata, u16 len)
         return;
     }
     
-    //协议�?
+    //协议号
     switch(pdata[2])
     {
         case PROTOCCOL_UPDATE_RESPONSE:
@@ -725,13 +737,13 @@ static void update_msg_parse_response(u8 *pdata, u16 len)
 
 static void update_msg_parse_file_data(u8 *pdata, u16 len)
 {
-    u16 current_idx = 0;  //从s_file_extend.block_current�? �?几个. [0-9]
+    u16 current_idx = 0;  //从s_file_extend.block_current计, 第 几个. [0-9]
     u16 block_number;
     u32 check_bit = 0x01;
     GM_ERRCODE ret = GM_SUCCESS;
     
     u8 one_send = 1;
-    one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: 1;
+    one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: UPDATE_MAX_PACK_ONE_SEND;
     
     block_number = MKWORD(pdata[13], pdata[14]);
     if(block_number < s_file_extend.block_current)
@@ -749,12 +761,12 @@ static void update_msg_parse_file_data(u8 *pdata, u16 len)
         {
             return;
         }
-        //else 最后一个包要触发下一批请�?
+        //else 最后一个包要触发下一批请求
     }
 
     /*
     2字节 1字节 2字节 8字节 N字节 1字节 1字节
-    包头  命令�?  报文长度    终端ID    数据内容    校验  结束�?
+    包头  命令字   报文长度    终端ID    数据内容    校验  结束符
     0x68 0x68   CMD LEN ID  DATA    CHK 0x0D
     */
     ret = update_msg_parse_one_block(block_number, &pdata[15], len - 17);
@@ -828,11 +840,11 @@ GM_ERRCODE update_msg_send_data_block_request(SocketType *socket)
     u8 buff[30];
     u16 len = sizeof(buff);
     u16 idx = 0, idx_save = 0;  //current place
-    u16 current_block = 0; //�?一直到 s_file_extend.total_blocks
-    u16 current_idx = 0;  //从s_file_extend.block_current�? �?几个. [0-9]
+    u16 current_block = 0; //从0一直到 s_file_extend.total_blocks
+    u16 current_idx = 0;  //从s_file_extend.block_current计, 第 几个. [0-9]
     u8 one_send = 1;
 
-    one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: 1;
+    one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: UPDATE_MAX_PACK_ONE_SEND;
     update_msg_pack_head(buff, &idx, len);  //13 bytes
     idx_save = idx; // save idx
     
@@ -849,7 +861,7 @@ GM_ERRCODE update_msg_send_data_block_request(SocketType *socket)
             {
                 continue;
             }
-            //else 最后一个包要触发下一批请�?
+            //else 最后一个包要触发下一批请求
         }
 
         idx = idx_save;  // restore idx for each block
@@ -905,7 +917,7 @@ void update_msg_start_data_block_request(SocketType *socket)
         s_file_extend.block_current,s_file_extend.block_status);
     
     
-    //从文件中读取上一次的s_file_extend, 与这次的比较, 如果相同, 就用上次�? 实现断点续传.
+    //从文件中读取上一次的s_file_extend, 与这次的比较, 如果相同, 就用上次的. 实现断点续传.
     ret = update_filemod_state_file_load();
     if(GM_SUCCESS == ret)
     {
@@ -916,6 +928,13 @@ void update_msg_start_data_block_request(SocketType *socket)
     {
         LOG(ERROR,"clock(%d) update_msg_start_data_block_request assert(total_len(%d)) failed.", util_clock(),s_file_extend.total_len);
         return;
+    }
+
+    //lz modified for only save at most 2 copies. 
+    // master/minor both exist , delete minor
+    if (GM_FS_CheckFile(UPDATE_TARGET_IMAGE) >= 0 && GM_FS_CheckFile(UPDATE_MINOR_IMAGE) >= 0)
+    {
+        util_delete_file(UPDATE_MINOR_IMAGE);
     }
 
     if(s_file_extend.handle >= 0)
@@ -951,7 +970,7 @@ void update_msg_start_data_block_request(SocketType *socket)
     {
         if(GM_SUCCESS != update_filemod_file_open())
         {
-            //打不开文件, 删除状态文件重新开�?
+            //打不开文件, 删除状态文件重新开始
             LOG(WARN,"clock(%d) update_msg_start_data_block_request open() failed, redo update.", util_clock());
 
             util_delete_file(UPDATE_UPGRADE_STATE_FILE);
@@ -983,7 +1002,7 @@ void update_msg_start_data_block_request(SocketType *socket)
 
 static void update_msg_parse_check_block_bits(u16 block)
 {
-    u16 current_idx = 0;  //从s_file_extend.block_current�? �?几个. [0-9]
+    u16 current_idx = 0;  //从s_file_extend.block_current计, 第 几个. [0-9]
     u32 check_bit = 0x01;
     u8 one_send = 1;
 
@@ -991,7 +1010,7 @@ static void update_msg_parse_check_block_bits(u16 block)
     if(current_idx) check_bit=check_bit << current_idx;
 
     s_file_extend.block_status = s_file_extend.block_status | check_bit;
-    one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: 1;
+    one_send = (STREAM_TYPE_DGRAM == config_service_update_socket_type())? UPDATE_MAX_PACK_ONE_SEND: UPDATE_MAX_PACK_ONE_SEND;
 
     for(current_idx = 0; current_idx < one_send; ++ current_idx)
     {
@@ -1038,10 +1057,10 @@ static void update_msg_parse_check_block_bits(u16 block)
         LOG(INFO,"clock(%d) update_msg_parse_check_block_bits allok(%d) one_send(%d).",
             util_clock(), s_file_extend.block_current, one_send);
 
-        //写断点续传信�?
+        //写断点续传信息
         update_filemod_state_file_save();
 
-        //接着请求后续�?
+        //接着请求后续包
         update_service_after_blocks_finish();
     }
 }
@@ -1284,7 +1303,7 @@ GM_ERRCODE update_msg_send_result_to_server(SocketType *socket)
         }
         else
         {
-            //失败太多次数�? 估计后面也是失败, 没必要增加服务器压力.
+            //失败太多次数了, 估计后面也是失败, 没必要增加服务器压力.
             update_service_finish(UPDATE_PING_TIME);
         }
     }
@@ -1348,8 +1367,8 @@ static bool is_update_file_extend_same(UpdateFileExtend *e1, UpdateFileExtend *e
     LOG(INFO,"clock(%d) is_update_file_extend_same same file start from:%d.", util_clock(), e2->block_current);
 
     //相同的情况下, 用旧的block_current
-    e1->block_current = e2->block_current; //当前包序�?
-    e1->block_status = e2->block_status; // 从低到高, 每一位代表从当前包开�?往后的回收情况,收到回包�?,未收到为0
+    e1->block_current = e2->block_current; //当前包序号
+    e1->block_status = e2->block_status; // 从低到高, 每一位代表从当前包开始,往后的回收情况,收到回包为1,未收到为0
     return true;
 }
 
@@ -1365,7 +1384,7 @@ static GM_ERRCODE update_filemod_state_file_save(void)
     int idx;
     char *pbuf = (char *)&s_file_extend;
 
-    // 由于要断点续�?所以收到的包要写到了文件系统中.
+    // 由于要断点续传,所以收到的包要写到了文件系统中.
     GM_FS_Commit(s_file_extend.handle);
 
     s_file_extend.state_sum = 0;

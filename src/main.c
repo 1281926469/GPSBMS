@@ -44,7 +44,7 @@
 #include "update_file.h"
 #include "bms.h"
 #include "gm_app.h"
-
+#include "gm_fs.h"
 
 static void timer_self_test_start(void);
 static void upload_boot_log(void);
@@ -109,7 +109,7 @@ void app_main_entry(void)
 	gps_power_on(true);
 	
 	
-	//延迟10秒再开始自检，否则还没有获取到IMEI会误入自检
+	//延迟30秒再开始自检，否则还没有获取到IMEI会误入自检
 	if(GM_REBOOT_POWER_ON == system_state_get_boot_reason(false))
 	{
 		GM_StartTimer(GM_TIMER_SELF_CHECK_START, 30*TIM_GEN_1SECOND, timer_self_test_start);
@@ -206,7 +206,16 @@ static void upload_boot_log(void)
 	
 	json_add_string(p_log_root, "app build time", SW_APP_BUILD_DATE_TIME);
 
-	app_check_sum = update_filemod_get_checksum(UPDATE_TARGET_IMAGE);
+    //lz modified for only save at most 2 copies. 
+    // master/minor both exist , use master
+    if (GM_FS_CheckFile(UPDATE_TARGET_IMAGE) >= 0)
+    {
+        app_check_sum = update_filemod_get_checksum(UPDATE_TARGET_IMAGE);
+    }
+    else  // UPDATE_MINOR_IMAGE 肯定存在, 否则不可能运行
+    {
+        app_check_sum = update_filemod_get_checksum(UPDATE_MINOR_IMAGE);
+    }
 	GM_snprintf(check_sum_str, 8, "%4X", app_check_sum);
 	system_state_set_bin_checksum(app_check_sum);
 
